@@ -1,57 +1,57 @@
-# Set Up ------------------------------------------------------------------
 library(shiny)
 library(ggplot2)
 library(plotly)
 library(tidyverse)
 
+# Wrangle the data :)
 df <- read.csv("https://raw.githubusercontent.com/owid/co2-data/master/owid-co2-data.csv")
 # get rid of continent data. Only want country
 mdf <- subset(subset(df, iso_code != ""), iso_code != "OWID_WRL")
 
-# Value Calculation ----------------------------------------------------------
+# Calculate Summary Values
 
-# 1
-# avg co2_growth_abs across all countries in 2018
-df_growth <- mdf %>% 
+# Value 1
+# average co2_growth_abs for all countries in 2018
+df_growth_abs <- mdf %>% 
   filter(year == 2018) %>% 
   select(co2_growth_abs) %>%
   na.omit()
-avg_growth <- mean(df_growth$co2_growth_abs, na.rm = T)
+avg_growth <- mean(df_growth_abs$co2_growth_abs, na.rm = T)
 
-# 2
-# highest co2_per_capita across all countries over time
-# output: year, country w/ highest co2_per_capita, and the exact value
+# Value 2
+# highest co2_per_capita for all countries over time
 df_capita <- mdf %>% 
   filter(co2_per_capita == max(co2_per_capita, na.rm = T)) %>% 
   select(year, country, co2_per_capita)
-capita_summary <- paste("The country with the highest average per capita CO2 emissions was", 
-                        df_capita$country, "with a value of", 
-                        df_capita$co2_per_capita, "million tonnes in", df_capita$year,".", sep = " ")
+per_capita_country <- df_capita$country
+per_capita_co2 <- prettyNum(df_capita$co2_per_capita, big.mark = ",", scientific = FALSE)
+per_capita_year <- df_capita$year
 
-# 3
-# total gas_co2 in 2018 across all countries
+# Value 3
+# total gas_co2 for all countries in 2018
 df_gas <- mdf %>% 
   filter(year == 2018) %>% 
   select(gas_co2) %>% 
   summarise(total = sum(gas_co2, na.rm = T))
-total_gas <- df_gas$total
+total_gas <- prettyNum(df_gas$total, big.mark = ",", scientific = FALSE)
 
-# 4
-# avg of coal_co2 in 2018 across all countries
-avg_coal <- mdf %>% 
+# Value 4
+# average of coal_co2 for all countries in 2018
+df_avg_coal <- mdf %>% 
   filter(year == 2018) %>% 
   select(coal_co2) %>% 
   summarise(avg = mean(coal_co2, na.rm = T)) %>% 
   pull(avg)
+avg_coal <- prettyNum(df_avg_coal, big.mark = ",", scientific = FALSE)
 
-# 5
-# Country with the highest cement_co2 of all times
-cement_ctr <- mdf %>% 
+# Value 5
+# country with highest cement_co2 (of all time)
+max_cement_country <- mdf %>% 
   filter(cement_co2 == max(cement_co2, na.rm = T)) %>% 
   pull(country)
 
 server <- function(input, output) {
-  output$message <- renderText({
+  output$greeting <- renderText({
     my_greeting <- "Hello, "
     user_name <- input$name
     if (user_name == "") {
@@ -61,24 +61,27 @@ server <- function(input, output) {
     message_str 
   })
   
-  output$summary1 <- renderText({
+  output$summary_one <- renderText({
     return(paste("1.", "The average for CO2 growth across all countries in 2018 was",
                  prettyNum(avg_growth, big.mark = ",", scientific = FALSE), "million tonnes.", sep = " "))
   })
-  output$summary2 <- renderText({
-    return(paste("2.", prettyNum(capita_summary, big.mark = ",", scientific = FALSE), sep = " "))
+  output$summary_two <- renderText({
+    # return(paste("2.", prettyNum(per_capita, big.mark = ",", scientific = FALSE), sep = " "))
+    return(paste("2.", "The country with the highest average per capita CO2 emissions was", 
+                 per_capita_country, "with a value of", 
+                 per_capita_co2, "million tonnes in", per_capita_year,".", sep = " "))
   })
-  output$summary3 <- renderText({
+  output$summary_three <- renderText({
     return(paste("3.", "Total CO2 emissions from gas production across all countries in 2018 was",
-                 prettyNum(total_gas, big.mark = ",", scientific = FALSE), "million tonnes.", sep = " "))
+                 total_gas, "million tonnes.", sep = " "))
   })
-  output$summary4 <- renderText({
+  output$summary_four <- renderText({
     return(paste("4.", "Total CO2 emissions from coal production was", 
-                 prettyNum(avg_coal, big.mark = ",", scientific = FALSE), "million tonnes.", sep = " "))
+                 avg_coal, "million tonnes.", sep = " "))
   })
-  output$summary5 <- renderText({
-    return(paste("5.", "The country with the highest CO2 emissions from cement production is ", 
-                 cement_ctr, ".", sep = ""))
+  output$summary_five <- renderText({
+    return(paste("5. ", "The country with the highest CO2 emissions from cement production is ", 
+                 max_cement_country, ".", sep = ""))
   })
   
   output$scatter <- renderPlotly({
@@ -91,14 +94,14 @@ server <- function(input, output) {
              coal = coal_co2, 
              gas = gas_co2, 
              other = other_industry_co2) %>% 
-      filter(country == input$country1)
+      filter(country == input$country_one)
     
     my_plot <- ggplot(mdf2, aes_string(x = mdf2$year, y = input$y_var)) + 
       geom_point() +
       xlab("Year") +
       ylab(paste("CO2 emission from", input$y_var, "(million tonnes)", sep = " ")) +
       ggtitle(paste("Growth of CO2 Emission by year from",
-                    input$y_var, "in", input$country1, sep = " "))
+                    input$y_var, "in", input$country_one, sep = " "))
     
     ggplotly(my_plot) 
   })
